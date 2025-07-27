@@ -1,1 +1,1 @@
-web: cd Okay-Im-ready-Please-describe-the-software-project-you-w/Bot_Deployment && python -m aiohttp.web -H 0.0.0.0 -P $PORT main:app
+web: python -m aiohttp.web -H 0.0.0.0 -P $PORT main:app
