@@ -53,3 +53,6 @@ pydantic>=2.0.0
 
 # Logging enhancements
 structlog>=23.1.0
+
+# Task scheduling
+schedule>=1.2.0
