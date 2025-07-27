@@ -145,7 +145,12 @@ class TradingBot:
         return runner
     
 async def main():
-    """Main function to start the Telegram bot"""
+    """Main function to start the Telegram bot (for local development only)"""
+    # Check if we're running on Render (has PORT env var)
+    if os.environ.get('PORT'):
+        logger.info("Detected Render deployment, skipping main() - using aiohttp.web instead")
+        return
+    
     bot = TradingBot()
     bot.start_time = time.time()
     
@@ -264,10 +269,14 @@ def create_app():
         async def init_bot():
             try:
                 logger.info("Initializing bot for web deployment...")
+                secure_logger.log_system_event("bot_startup", "AI Trading Bot startup initiated for web deployment")
                 
                 if not bot_instance.validate_environment():
                     logger.error("Environment validation failed")
+                    secure_logger.log_security_event("startup_failed", "Bot startup failed due to environment validation")
                     return
+                
+                logger.info("🚀 Starting performance optimizations...")
                 
                 # Start background services with error handling
                 try:
@@ -277,18 +286,35 @@ def create_app():
                 except Exception as e:
                     logger.warning(f"Background services failed to start: {e}")
                 
-                # Initialize Telegram handler
+                # Note: Health server is NOT started here because aiohttp.web handles the web server
+                # The health endpoints are already registered in the main app routes
+                logger.info("Health endpoints available via main web server (no separate health server needed)")
+                
+                # Initialize Telegram handler with security components
                 bot_instance.telegram_handler = TelegramHandler()
+                logger.info("TelegramHandler created successfully")
+                secure_logger.log_system_event("telegram_handler_initialized", "Telegram handler created with security middleware")
+                
+                # Mark as ready
                 bot_instance.is_ready = True
                 metrics.set_ready_status(True)
                 
-                logger.info("Bot initialized successfully for web deployment")
+                # Log cache statistics
+                cache_stats = get_cache_stats()
+                logger.info(f"📊 Cache initialized: {cache_stats['performance_cache']['entries']} entries")
+                
+                logger.info("🤖 Trading bot started successfully with performance optimizations and security!")
+                logger.info("🔒 Security features: Rate limiting, Input validation, Secure logging, Session management")
+                logger.info("Bot is ready to serve requests")
+                
+                secure_logger.log_system_event("bot_startup_complete", "Trading bot startup completed successfully with all security features enabled")
                 
                 # Start the telegram bot in background
                 asyncio.create_task(bot_instance.telegram_handler.run())
                 
             except Exception as e:
                 logger.error(f"Bot initialization failed: {e}")
+                secure_logger.log_security_event("bot_crash", f"Bot initialization failed: {str(e)}", severity="critical")
                 # Don't fail the web app if bot fails
                 bot_instance.is_ready = False
         
@@ -310,11 +336,17 @@ def create_app():
         # Graceful shutdown
         async def cleanup_handler(app):
             logger.info("Shutting down application...")
+            secure_logger.log_system_event("bot_shutdown", "Trading bot shutdown initiated")
+            
             if bot_instance and bot_instance.telegram_handler:
                 try:
                     await bot_instance.telegram_handler.stop()
+                    logger.info("Telegram handler stopped")
                 except Exception as e:
                     logger.error(f"Error stopping telegram handler: {e}")
+            
+            # Log final shutdown
+            secure_logger.log_system_event("bot_shutdown_complete", "Trading bot shutdown completed")
         
         _app_instance.on_startup.append(startup_handler)
         _app_instance.on_cleanup.append(cleanup_handler)
