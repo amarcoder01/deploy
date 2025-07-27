@@ -3,6 +3,7 @@ services:
     name: tradeai-companion
     runtime: python3
     buildpack: python
+    pythonVersion: 3.12
     plan: starter
     buildCommand: "pip install -r requirements.txt"
     startCommand: "python -m aiohttp.web -H 0.0.0.0 -P $PORT main:app"
