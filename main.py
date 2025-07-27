@@ -295,7 +295,17 @@ def create_app():
         # Schedule bot initialization when event loop is available
         async def startup_handler(app):
             logger.info("Web application startup initiated")
-            await init_bot()
+            # Use create_task to avoid blocking the startup
+            asyncio.create_task(init_bot_background())
+        
+        # Non-blocking bot initialization
+        async def init_bot_background():
+            """Initialize bot in background without blocking web server startup"""
+            try:
+                await asyncio.sleep(1)  # Small delay to ensure web server is ready
+                await init_bot()
+            except Exception as e:
+                logger.error(f"Background bot initialization failed: {e}")
         
         # Graceful shutdown
         async def cleanup_handler(app):
@@ -337,7 +347,18 @@ if __name__ == "__main__":
 # For Render deployment - aiohttp.web expects a factory function
 def app(argv=None):
     """Factory function for aiohttp.web deployment"""
-    return create_app()
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+    
+    logger.info("App factory called by aiohttp.web")
+    logger.info(f"Arguments: {argv}")
+    
+    app_instance = create_app()
+    logger.info(f"Created app instance: {type(app_instance)}")
+    logger.info(f"App has {len(list(app_instance.router.routes()))} routes")
+    
+    return app_instance
 
 # Alternative entry point for direct web server deployment
 async def init_app():
@@ -348,3 +369,6 @@ async def init_app():
 def get_app():
     """Get the application instance for WSGI/ASGI servers"""
     return create_app()
+
+# Direct app instance for immediate access
+app_instance = create_app()
