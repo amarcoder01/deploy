@@ -233,7 +233,11 @@ def create_app():
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
         
-        _app_instance = web.Application()
+        # Create application with proper middleware for production
+        _app_instance = web.Application(
+            middlewares=[],
+            client_max_size=1024**2  # 1MB max request size
+        )
         
         # Initialize bot instance
         bot_instance = TradingBot()
@@ -290,6 +294,7 @@ def create_app():
         
         # Schedule bot initialization when event loop is available
         async def startup_handler(app):
+            logger.info("Web application startup initiated")
             await init_bot()
         
         # Graceful shutdown
@@ -303,6 +308,10 @@ def create_app():
         
         _app_instance.on_startup.append(startup_handler)
         _app_instance.on_cleanup.append(cleanup_handler)
+        
+        # Log application creation for debugging
+        logger.info(f"Web application created successfully. Type: {type(_app_instance)}")
+        logger.info(f"Application routes: {len(_app_instance.router.routes())} routes registered")
     
     return _app_instance
 
@@ -328,4 +337,14 @@ if __name__ == "__main__":
 # For Render deployment - aiohttp.web expects a factory function
 def app(argv=None):
     """Factory function for aiohttp.web deployment"""
+    return create_app()
+
+# Alternative entry point for direct web server deployment
+async def init_app():
+    """Initialize and return the web application"""
+    return create_app()
+
+# For gunicorn/uvicorn deployment
+def get_app():
+    """Get the application instance for WSGI/ASGI servers"""
     return create_app()
