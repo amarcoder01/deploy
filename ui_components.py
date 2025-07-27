@@ -397,17 +397,19 @@ Your AI-powered trading assistant is ready to help you navigate the markets with
         return formatted_message
     
     @staticmethod
-    def format_help_section(title: str, commands: List[Tuple[str, str]], emoji: str = None) -> str:
+    def format_help_section(title: str, description: str, commands: List[str], emoji: str = None) -> str:
         """Format help sections with consistent styling"""
         section_emoji = emoji or TradingBotUI.EMOJIS['info']
         
         formatted_section = f"""
 {section_emoji} **{title.upper()}**
 
+{description}
+
         """
         
-        for command, description in commands:
-            formatted_section += f"• `{command}` - {description}\n"
+        for command in commands:
+            formatted_section += f"• {command}\n"
         
         return formatted_section
     

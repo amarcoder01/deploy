@@ -3167,9 +3167,24 @@ Do NOT fetch any actual stock data - just provide a conversational response guid
                 logger.info("Bot stopping...")
             finally:
                 logger.info("Shutting down bot...")
+                
+                # Cancel alert monitoring task if it exists
+                if hasattr(self, 'alert_monitoring_task') and self.alert_monitoring_task:
+                    logger.info("Cancelling alert monitoring task...")
+                    self.alert_monitoring_task.cancel()
+                    try:
+                        await self.alert_monitoring_task
+                    except asyncio.CancelledError:
+                        logger.info("Alert monitoring task cancelled successfully")
+                    except Exception as e:
+                        logger.error(f"Error cancelling alert monitoring task: {e}")
+                
                 # Clean shutdown
+                logger.info("Stopping application...")
                 await self.application.stop()
+                logger.info("Shutting down application...")
                 await self.application.shutdown()
+                logger.info("Bot shutdown complete")
             
         except KeyboardInterrupt:
             logger.info("Bot stopped by user")
