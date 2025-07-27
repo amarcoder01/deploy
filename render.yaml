@@ -1,0 +1,60 @@
+services:
+  - type: web
+    name: tradeai-companion
+    runtime: python3
+    plan: starter
+    buildCommand: "./Okay-Im-ready-Please-describe-the-software-project-you-w/Bot_Deployment/build.sh"
+    startCommand: "cd Okay-Im-ready-Please-describe-the-software-project-you-w/Bot_Deployment && gunicorn main:app --bind 0.0.0.0:$PORT --workers 2 --worker-class aiohttp.GunicornWebWorker --timeout 120 --keep-alive 2 --max-requests 1000 --max-requests-jitter 50"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.12
+      - key: TELEGRAM_API_TOKEN
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ALPACA_API_KEY
+        sync: false
+      - key: ALPACA_API_SECRET
+        sync: false
+      - key: ALPACA_BASE_URL
+        value: https://paper-api.alpaca.markets
+      - key: CHART_IMG_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: tradeai-db
+          property: connectionString
+      - key: PORT
+        value: 10000
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: tradeai-redis
+          property: connectionString
+      - key: ENVIRONMENT
+        value: production
+      - key: PYTHONPATH
+        value: .
+      - key: TZ
+        value: UTC
+      - key: APSCHEDULER_TIMEZONE
+        value: UTC
+      - key: MPLBACKEND
+        value: Agg
+      - key: PYTHONUNBUFFERED
+        value: 1
+      - key: PIP_NO_CACHE_DIR
+        value: 1
+      - key: GUNICORN_CMD_ARGS
+        value: "--preload --worker-connections 1000"
+
+  - type: redis
+    name: tradeai-redis
+    plan: starter
+    ipAllowList: []
+
+databases:
+  - name: tradeai-db
+    plan: starter
+    databaseName: tradeai_companion
+    user: tradeai_user
