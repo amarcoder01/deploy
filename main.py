@@ -217,13 +217,13 @@ async def main():
         secure_logger.log_system_event("bot_shutdown_complete", "Trading bot shutdown completed")
 
 # Create a global app instance for Render deployment
-app = None
+_app_instance = None
 bot_instance = None
 
 def create_app():
     """Create and return the web application for deployment"""
-    global app, bot_instance
-    if app is None:
+    global _app_instance, bot_instance
+    if _app_instance is None:
         from aiohttp import web
         import logging
         
@@ -233,7 +233,7 @@ def create_app():
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
         
-        app = web.Application()
+        _app_instance = web.Application()
         
         # Initialize bot instance
         bot_instance = TradingBot()
@@ -250,11 +250,11 @@ def create_app():
         async def favicon_handler(request):
             return web.Response(status=404)
         
-        app.router.add_get('/health', bot_instance.health_check)
-        app.router.add_get('/ready', bot_instance.readiness_check)
-        app.router.add_get('/metrics', bot_instance.metrics_endpoint)
-        app.router.add_get('/', root_handler)
-        app.router.add_get('/favicon.ico', favicon_handler)
+        _app_instance.router.add_get('/health', bot_instance.health_check)
+        _app_instance.router.add_get('/ready', bot_instance.readiness_check)
+        _app_instance.router.add_get('/metrics', bot_instance.metrics_endpoint)
+        _app_instance.router.add_get('/', root_handler)
+        _app_instance.router.add_get('/favicon.ico', favicon_handler)
         
         # Initialize bot in background
         async def init_bot():
@@ -301,10 +301,10 @@ def create_app():
                 except Exception as e:
                     logger.error(f"Error stopping telegram handler: {e}")
         
-        app.on_startup.append(startup_handler)
-        app.on_cleanup.append(cleanup_handler)
+        _app_instance.on_startup.append(startup_handler)
+        _app_instance.on_cleanup.append(cleanup_handler)
     
-    return app
+    return _app_instance
 
 if __name__ == "__main__":
     try:
