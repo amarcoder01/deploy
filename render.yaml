@@ -2,6 +2,7 @@ services:
   - type: web
     name: tradeai-companion
     runtime: python3
+    buildpack: python
     plan: starter
     buildCommand: "pip install -r requirements.txt"
     startCommand: "cd Okay-Im-ready-Please-describe-the-software-project-you-w/Bot_Deployment && python -m aiohttp.web -H 0.0.0.0 -P $PORT main:app"
