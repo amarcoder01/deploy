@@ -325,7 +325,5 @@ if __name__ == "__main__":
         else:
             raise
 
-# For Render deployment - aiohttp.web expects a callable
-def app(extra_argv=None):
-    """Factory function for aiohttp.web deployment"""
-    return create_app()
+# For Render deployment - aiohttp.web expects an Application instance
+app = create_app()
