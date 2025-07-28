@@ -1,1 +1,1 @@
-web: python start_server.py
+web: gunicorn main:create_app --config gunicorn_config.py
