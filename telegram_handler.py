@@ -176,6 +176,130 @@ class TelegramHandler:
 
         logger.info("Telegram handler initialized with all advanced trading services, intelligent memory, modern UI, and enhanced error handling")
     
+    async def run(self):
+        """Run the Telegram bot with proper initialization and cleanup"""
+        try:
+            logger.info("Starting Telegram bot...")
+            
+            # Create application
+            self.application = Application.builder().token(self.bot_token).build()
+            
+            # Setup all handlers
+            self._setup_handlers()
+            
+            # Initialize and start the application
+            await self.application.initialize()
+            await self.application.start()
+            
+            # Start polling for updates
+            logger.info("Starting bot polling...")
+            await self.application.updater.start_polling(
+                drop_pending_updates=True,  # Drop pending updates to avoid conflicts
+                allowed_updates=None  # Allow all update types
+            )
+            
+            # Start alert monitoring
+            if not self.alert_monitoring_task:
+                await self._start_alert_monitoring()
+                logger.info("Alert monitoring started")
+            
+            logger.info("✅ Telegram bot is running successfully!")
+            
+            # Keep the bot running
+            try:
+                while True:
+                    await asyncio.sleep(1)
+            except asyncio.CancelledError:
+                logger.info("Bot run loop cancelled")
+                
+        except Exception as e:
+            logger.error(f"Error starting Telegram bot: {e}")
+            await self.stop()
+            raise
+    
+    async def _start_alert_monitoring(self):
+        """Start the alert monitoring service"""
+        try:
+            if hasattr(self, 'alert_service') and self.alert_service:
+                # Start alert monitoring in background
+                self.alert_monitoring_task = asyncio.create_task(
+                    self.alert_service.start_alert_monitoring()
+                )
+                logger.info("Alert monitoring task created successfully")
+            else:
+                logger.warning("Alert service not available, skipping alert monitoring")
+        except Exception as e:
+            logger.error(f"Error starting alert monitoring: {e}")
+    
+    async def stop(self):
+        """Stop the Telegram bot gracefully"""
+        try:
+            logger.info("Stopping Telegram bot...")
+            
+            # Stop alert monitoring
+            if self.alert_monitoring_task:
+                self.alert_monitoring_task.cancel()
+                try:
+                    await self.alert_monitoring_task
+                except asyncio.CancelledError:
+                    pass
+                self.alert_monitoring_task = None
+                logger.info("Alert monitoring stopped")
+            
+            # Stop typing tasks
+            for task_id, task in list(self._typing_tasks.items()):
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+            self._typing_tasks.clear()
+            
+            # Stop the application
+            if self.application:
+                await self.application.updater.stop()
+                await self.application.stop()
+                await self.application.shutdown()
+                logger.info("Telegram application stopped")
+            
+            # Reset the started flag to allow restart
+            TelegramHandler._started = False
+            
+            logger.info("✅ Telegram bot stopped successfully")
+            
+        except Exception as e:
+            logger.error(f"Error stopping Telegram bot: {e}")
+            # Reset the flag even if there's an error
+            TelegramHandler._started = False
+    
+    def _setup_handlers(self):
+        """Setup all command and message handlers"""
+        if not self.application:
+            raise RuntimeError("Application not initialized")
+        
+        # Command handlers
+        self.application.add_handler(CommandHandler("start", self.start_command))
+        self.application.add_handler(CommandHandler("help", self.help_command))
+        self.application.add_handler(CommandHandler("menu", self.menu_command))
+        self.application.add_handler(CommandHandler("price", self.price_command))
+        self.application.add_handler(CommandHandler("chart", self.chart_command))
+        self.application.add_handler(CommandHandler("analyze", self.analyze_command))
+        self.application.add_handler(CommandHandler("alert", self.alert_command))
+        self.application.add_handler(CommandHandler("alerts", self.alerts_command))
+        self.application.add_handler(CommandHandler("portfolio", self.portfolio_command))
+        self.application.add_handler(CommandHandler("watchlist", self.watchlist_command))
+        self.application.add_handler(CommandHandler("predict", self.predict_command))
+        self.application.add_handler(CommandHandler("strategy", self.strategy_command))
+        
+        # Callback query handler for inline keyboards
+        self.application.add_handler(CallbackQueryHandler(self.callback_handler.handle_callback))
+        
+        # Message handlers
+        self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
+        self.application.add_handler(MessageHandler(filters.PHOTO, self.handle_photo))
+        
+        logger.info("All handlers setup successfully")
+    
     def _get_ist_timestamp(self) -> str:
         """Get current timestamp in IST format"""
         return format_ist_timestamp('%Y-%m-%d %H:%M:%S IST')
