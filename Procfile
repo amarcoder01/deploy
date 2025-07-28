@@ -1,1 +1,1 @@
-web: python -m aiohttp.web -H 0.0.0.0 -P $PORT main:app
+web: python start_server.py
