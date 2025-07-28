@@ -287,18 +287,32 @@ class TelegramHandler:
             return {'status': 'error', 'message': str(e)}
     
     async def _start_alert_monitoring(self):
-        """Start the alert monitoring service"""
+        """Start the alert monitoring service with improved error handling"""
         try:
             if hasattr(self, 'alert_service') and self.alert_service:
-                # Start alert monitoring in background
-                self.alert_monitoring_task = asyncio.create_task(
-                    self.alert_service.start_alert_monitoring()
-                )
-                logger.info("Alert monitoring task created successfully")
+                # Ensure alert service is properly initialized
+                if hasattr(self.alert_service, 'market_service') and self.alert_service.market_service:
+                    # Start alert monitoring in background
+                    self.alert_monitoring_task = asyncio.create_task(
+                        self.alert_service.start_alert_monitoring()
+                    )
+                    logger.info("Alert monitoring task created successfully")
+                else:
+                    logger.error("Alert service market_service not properly initialized")
+                    # Try to restart after delay
+                    asyncio.create_task(self._retry_alert_monitoring())
             else:
                 logger.warning("Alert service not available, skipping alert monitoring")
         except Exception as e:
             logger.error(f"Error starting alert monitoring: {e}")
+            # Try to restart after delay
+            asyncio.create_task(self._retry_alert_monitoring())
+    
+    async def _retry_alert_monitoring(self):
+        """Retry alert monitoring after a delay"""
+        await asyncio.sleep(30)  # Wait 30 seconds before retry
+        logger.info("Retrying alert monitoring startup...")
+        await self._start_alert_monitoring()
     
     async def stop(self):
         """Stop the Telegram bot gracefully"""
@@ -1398,12 +1412,30 @@ Do NOT fetch any actual stock data - just provide a conversational response guid
             price_data = performance_cache.get(cache_key)
             
             if not price_data:
-                # Use connection pool for API call
-                async with await connection_pool.acquire("market_data") as conn:
-                    price_data = await self.market_service.get_stock_price(normalized_symbol, update.effective_user.id)
+                # Show typing indicator for longer operations
+                await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+                
+                # Use connection pool for API call with retry logic
+                max_retries = 2
+                for attempt in range(max_retries):
+                    try:
+                        async with await connection_pool.acquire("market_data") as conn:
+                            price_data = await self.market_service.get_stock_price(normalized_symbol, update.effective_user.id)
+                        
+                        if price_data and price_data.get('price', 0) > 0:
+                            break  # Success, exit retry loop
+                        elif attempt < max_retries - 1:
+                            logger.info(f"Retrying price fetch for {normalized_symbol} (attempt {attempt + 2}/{max_retries})")
+                            await asyncio.sleep(2)  # Wait before retry
+                    except Exception as e:
+                        logger.warning(f"Price fetch attempt {attempt + 1} failed for {normalized_symbol}: {e}")
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(2)  # Wait before retry
+                        else:
+                            logger.error(f"All price fetch attempts failed for {normalized_symbol}")
                 
                 # Cache the result if successful
-                if price_data:
+                if price_data and price_data.get('price', 0) > 0:
                     performance_cache.set(cache_key, price_data, ttl=30)  # Cache for 30 seconds
             
             if price_data:
@@ -1420,21 +1452,47 @@ Do NOT fetch any actual stock data - just provide a conversational response guid
                     parse_mode='Markdown'
                 )
             else:
-                error_message = TradingBotUI.format_error_message(
-                    f"Could not fetch price data for {normalized_symbol}",
-                    [
-                        "Market is currently closed",
-                        "Stock is delisted or suspended", 
-                        "Temporary data provider issue",
-                        "Symbol requires different format"
-                    ],
-                    [
-                        "Verify symbol on financial websites",
-                        "Try during market hours (9:30 AM - 4:00 PM ET)",
-                        "Check if company has been acquired/merged",
-                        "Use /help for more commands"
-                    ]
-                )
+                # Check if this might be a rate limiting issue
+                recent_errors = getattr(self, '_recent_price_errors', [])
+                current_time = time.time()
+                # Clean old errors (older than 5 minutes)
+                recent_errors = [t for t in recent_errors if current_time - t < 300]
+                
+                if len(recent_errors) >= 3:  # Multiple recent failures suggest rate limiting
+                    error_message = TradingBotUI.format_error_message(
+                        f"⚠️ Temporary service limitation for {normalized_symbol}",
+                        [
+                            "Data providers are experiencing high traffic",
+                            "Rate limiting is in effect",
+                            "This is temporary and will resolve shortly"
+                        ],
+                        [
+                            "Wait 2-3 minutes before trying again",
+                            "Try a different stock symbol",
+                            "Check back during off-peak hours",
+                            "Use /help for other commands"
+                        ]
+                    )
+                else:
+                    error_message = TradingBotUI.format_error_message(
+                        f"Could not fetch price data for {normalized_symbol}",
+                        [
+                            "Market is currently closed",
+                            "Stock is delisted or suspended", 
+                            "Temporary data provider issue",
+                            "Symbol requires different format"
+                        ],
+                        [
+                            "Verify symbol on financial websites",
+                            "Try during market hours (9:30 AM - 4:00 PM ET)",
+                            "Check if company has been acquired/merged",
+                            "Use /help for more commands"
+                        ]
+                    )
+                
+                # Track this error
+                recent_errors.append(current_time)
+                self._recent_price_errors = recent_errors
                 keyboard = TradingBotUI.create_main_menu()
                 
                 await update.message.reply_text(

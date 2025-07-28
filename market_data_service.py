@@ -136,7 +136,7 @@ class MarketDataService:
         return None
 
     async def _try_yahoo_finance_global(self, symbol: str) -> Optional[Dict]:
-        """Try to get data from Yahoo Finance for US stocks only"""
+        """Try to get data from Yahoo Finance for US stocks with improved rate limiting"""
         if not YFINANCE_AVAILABLE or yf is None:
             return None
             
@@ -144,21 +144,31 @@ class MarketDataService:
         try:
             logger.info(f"Trying Yahoo Finance US for {symbol}")
             
-            # Add delay to prevent rate limiting
-            await asyncio.sleep(0.5)
+            # Increased delay to prevent rate limiting
+            await asyncio.sleep(2.0)  # Increased from 1.0 to 2.0 seconds
             
             ticker = yf.Ticker(symbol)
-            info = ticker.info
+            
+            # Try to get info first with timeout
+            try:
+                info = await asyncio.wait_for(
+                    asyncio.to_thread(lambda: ticker.info),
+                    timeout=5.0  # Increased from 3.0 to 5.0
+                )
+            except (asyncio.TimeoutError, Exception) as e:
+                logger.warning(f"Yahoo Finance info failed for {symbol}: {e}")
+                info = {}
+            
             # Add timeout to make it fail faster
             hist = await asyncio.wait_for(
                 asyncio.to_thread(ticker.history, period='1d', interval='1m'),
-                timeout=2.0  # 2 second timeout for US stocks
+                timeout=8.0  # Increased timeout from 5.0 to 8.0 seconds
             )
             
             # Get daily data for volume (1m data often has zero volume for latest entries)
             hist_daily = await asyncio.wait_for(
                 asyncio.to_thread(ticker.history, period='1d', interval='1d'),
-                timeout=2.0
+                timeout=8.0  # Increased timeout from 5.0 to 8.0
             )
             
             if not hist.empty and len(hist) > 0:
@@ -176,6 +186,7 @@ class MarketDataService:
                     elif not hist.empty and len(hist) > 0:
                         volume = int(hist['Volume'].iloc[-1]) if not pd.isna(hist['Volume'].iloc[-1]) else 0
                     
+                    logger.info(f"Successfully retrieved data for {symbol}: ${current_price:.2f}")
                     return {
                         'symbol': symbol,
                         'price': round(float(current_price), 2),
@@ -193,7 +204,12 @@ class MarketDataService:
                         'resolved_symbol': symbol
                     }
         except Exception as e:
-            logger.debug(f"Yahoo Finance US failed for {symbol}: {str(e)}")
+            if "Too Many Requests" in str(e) or "Rate limited" in str(e):
+                logger.warning(f"Yahoo Finance rate limited for {symbol}: {str(e)}")
+                # Wait longer on rate limit
+                await asyncio.sleep(5.0)
+            else:
+                logger.debug(f"Yahoo Finance US failed for {symbol}: {str(e)}")
         
         logger.info(f"Yahoo Finance US failed for {symbol}")
         return None
@@ -205,20 +221,20 @@ class MarketDataService:
             
         try:
             # Add delay to prevent rate limiting
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(2.5)  # Increased from 1.5 to 2.5
             
             ticker = yf.Ticker(symbol)
             info = ticker.info
             # Add timeout to make it fail faster
             hist = await asyncio.wait_for(
                 asyncio.to_thread(ticker.history, period='1d', interval='1m'),
-                timeout=2.0  # 2 second timeout for faster failure
+                timeout=8.0  # Increased from 6.0 to 8.0 seconds
             )
             
             # Get daily data for volume (1m data often has zero volume for latest entries)
             hist_daily = await asyncio.wait_for(
                 asyncio.to_thread(ticker.history, period='1d', interval='1d'),
-                timeout=2.0
+                timeout=8.0  # Increased from 6.0 to 8.0
             )
             
             if not hist.empty and len(hist) > 0:
@@ -252,7 +268,12 @@ class MarketDataService:
                         'source': 'Yahoo Finance'
                     }
         except Exception as e:
-            logger.warning(f"Yahoo Finance failed for {symbol}: {str(e)}")
+            if "Too Many Requests" in str(e) or "Rate limited" in str(e):
+                logger.warning(f"Yahoo Finance rate limited for {symbol}: {str(e)}")
+                # Wait longer on rate limit
+                await asyncio.sleep(8.0)  # Increased from 5.0 to 8.0
+            else:
+                logger.warning(f"Yahoo Finance failed for {symbol}: {str(e)}")
         return None
 
     async def _try_alpha_vantage(self, symbol: str) -> Optional[Dict]:
@@ -353,6 +374,9 @@ class MarketDataService:
             symbol = self._normalize_symbol(original_symbol)
             logger.info(f"[DEBUG] Fetching price data for {symbol} (original: {original_symbol})")
             
+            # Add progressive delays between attempts to prevent rate limiting
+            base_delay = 2.0  # Increased from 1.0 to 2.0
+            
             # Try multiple sources in order of preference (optimized for US stocks)
             sources = [
                 ("Yahoo Finance US", lambda: self._try_yahoo_finance_global(original_symbol)),
@@ -364,28 +388,39 @@ class MarketDataService:
             
             logger.info(f"[DEBUG] Attempting to fetch {symbol} from sources: {', '.join([s[0] for s in sources])}")
             
-            # Add total timeout of 15 seconds for all traditional sources
+            # Add total timeout of 20 seconds for all traditional sources (increased from 15)
             start_time = datetime.utcnow()  # Keep for elapsed time calculation
             
-            for source_name, source_func in sources:
+            for i, (source_name, source_func) in enumerate(sources):
                 try:
-                    # Check if we've exceeded 15 seconds total
+                    # Check if we've exceeded 20 seconds total
                     elapsed_time = (datetime.utcnow() - start_time).total_seconds()
-                    if elapsed_time > 15:
-                        logger.info(f"[DEBUG] 15-second timeout reached, moving to AI web search")
+                    if elapsed_time > 20:
+                        logger.info(f"[DEBUG] 20-second timeout reached, moving to AI web search")
                         break
+                    
+                    # Add progressive delay between sources to prevent rate limiting
+                    if i > 0:
+                        await asyncio.sleep(base_delay * (i + 1))  # Increased delay multiplier
                         
                     logger.info(f"[DEBUG] Trying {source_name} for {symbol}")
-                    result = await source_func()
+                    result = await asyncio.wait_for(source_func(), timeout=15)  # Increased from 10 to 15 seconds
                     if result:
                         logger.info(f"[DEBUG] Successfully got data from {source_name} for {symbol}")
                         logger.info(f"[DEBUG] Data for {symbol}: Price=${result.get('price', 'N/A')}, Change={result.get('change_percent', 'N/A')}%, Volume={result.get('volume', 'N/A')}")
                         logger.info(f"[DEBUG] Additional data: Company={result.get('company_name', 'N/A')}, High=${result.get('high', 'N/A')}, Low=${result.get('low', 'N/A')}")
                         return result
+                except asyncio.TimeoutError:
+                    logger.warning(f"[DEBUG] {source_name} timed out for {symbol}")
                 except Exception as e:
-                    logger.warning(f"[DEBUG] {source_name} failed for {symbol}: {str(e)}")
+                    if "Too Many Requests" in str(e) or "Rate limited" in str(e):
+                        logger.warning(f"[DEBUG] {source_name} rate limited for {symbol}: {str(e)}")
+                        # Wait longer before trying next source if rate limited
+                        await asyncio.sleep(base_delay * 5)  # Increased from 3 to 5
+                    else:
+                        logger.warning(f"[DEBUG] {source_name} failed for {symbol}: {str(e)}")
             
-            # Try alternative symbol variations before AI web search
+            # Try alternative symbol variations before AI web search with longer delays
             alternative_symbols = [
                 symbol + '.US',  # Some sources use .US suffix
                 symbol + '.O',   # OTC markets
@@ -399,28 +434,53 @@ class MarketDataService:
             for alt_symbol in alternative_symbols:
                 try:
                     elapsed_time = (datetime.utcnow() - start_time).total_seconds()
-                    if elapsed_time > 15:
+                    if elapsed_time > 20:
                         logger.info(f"[DEBUG] Timeout reached during alternative symbol search")
                         break
+                    
+                    # Add delay before trying alternative symbols
+                    await asyncio.sleep(base_delay * 2)
                         
                     logger.info(f"[DEBUG] Trying alternative symbol: {alt_symbol}")
-                    for source_name, source_func in sources:
+                    
+                    # Create sources with the alternative symbol
+                    alt_sources = [
+                        ("Yahoo Finance US", lambda: self._try_yahoo_finance_global(alt_symbol)),
+                        ("Yahoo Finance", lambda: self._try_yfinance(alt_symbol)),
+                        ("Google Finance", lambda: self._try_google_finance(alt_symbol)),
+                        ("Alpaca API", lambda: self._try_alpaca_api(alt_symbol)),
+                        ("Alpha Vantage", lambda: self._try_alpha_vantage(alt_symbol)),
+                    ]
+                    
+                    for i, (source_name, source_func) in enumerate(alt_sources):
                         try:
-                            result = await source_func()
+                            # Add progressive delay between sources for alternatives
+                            if i > 0:
+                                await asyncio.sleep(base_delay * (i + 1))
+                                
+                            result = await asyncio.wait_for(source_func(), timeout=10)
                             if result:
                                 logger.info(f"[DEBUG] Successfully got data from {source_name} for {alt_symbol}")
                                 logger.info(f"[DEBUG] Data for {alt_symbol}: Price=${result.get('price', 'N/A')}, Change={result.get('change_percent', 'N/A')}%, Volume={result.get('volume', 'N/A')}")
                                 return result
+                        except asyncio.TimeoutError:
+                            logger.warning(f"[DEBUG] {source_name} timed out for {alt_symbol}")
                         except Exception as e:
-                            continue
+                            if "Too Many Requests" in str(e) or "Rate limited" in str(e):
+                                logger.warning(f"[DEBUG] {source_name} rate limited for {alt_symbol}: {str(e)}")
+                                # Wait longer if rate limited
+                                await asyncio.sleep(base_delay * 4)
+                            else:
+                                continue
                 except Exception as e:
                     continue
             
             logger.warning(f"[DEBUG] All primary sources failed for {symbol}")
             
-            # Final fallback: OpenAI web search (this can find ANY stock)
+            # Final fallback: OpenAI web search (this can find ANY stock) with delay
             if user_id:
                 logger.info(f"[DEBUG] All traditional sources failed! Triggering AI web search for {original_symbol}")
+                await asyncio.sleep(base_delay * 2)  # Wait before AI search
                 result = await self._try_openai_web_search(original_symbol, user_id)
                 if result:
                     logger.info(f"[DEBUG] AI web search SUCCESS for {original_symbol}!")

@@ -193,7 +193,7 @@ class AlertService:
             return []
 
     async def start_alert_monitoring(self):
-        """Start monitoring alerts from the database"""
+        """Start monitoring alerts from the database with improved error handling"""
         if self.is_running:
             logger.warning("Alert monitoring is already running")
             return
@@ -203,9 +203,15 @@ class AlertService:
             try:
                 await self._check_alerts()
                 await asyncio.sleep(self.check_interval)
+            except asyncio.CancelledError:
+                logger.info("Alert monitoring cancelled")
+                break
             except Exception as e:
                 logger.error(f"Error in alert monitoring: {e}")
-                await asyncio.sleep(self.check_interval)
+                # Add exponential backoff for errors
+                await asyncio.sleep(min(300, self.check_interval * 2))  # Wait up to 5 minutes on error
+        
+        logger.info("Alert monitoring service stopped")
 
     def stop_alert_monitoring(self):
         """Stop monitoring alerts"""

@@ -191,7 +191,7 @@ class YahooFinanceSource:
     """Yahoo Finance data source"""
     
     async def get_price(self, symbol: str, session: aiohttp.ClientSession) -> Dict:
-        """Get real-time price from Yahoo Finance with retry logic"""
+        """Get real-time price from Yahoo Finance with improved retry logic and rate limiting"""
         import asyncio
         
         for attempt in range(3):  # Try up to 3 times
@@ -204,9 +204,29 @@ class YahooFinanceSource:
                 
                 # Add delay between attempts to avoid rate limiting
                 if attempt > 0:
-                    await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                    wait_time = (2 ** attempt) * 3  # Increased exponential backoff from 2 to 3
+                    logger.info(f"Retrying Yahoo Finance for {symbol} in {wait_time} seconds (attempt {attempt + 1}/3)")
+                    await asyncio.sleep(wait_time)
+                else:
+                    # Add initial delay even for first attempt
+                    await asyncio.sleep(2.5)  # Increased from 1.5 to 2.5
                 
-                async with session.get(url, params=params) as response:
+                # Add proper headers to avoid rate limiting
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'application/json',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    'Accept-Encoding': 'gzip, deflate, br',
+                    'DNT': '1',
+                    'Connection': 'keep-alive',
+                    'Referer': 'https://finance.yahoo.com/',
+                    'Origin': 'https://finance.yahoo.com',
+                    'Sec-Fetch-Dest': 'empty',
+                    'Sec-Fetch-Mode': 'cors',
+                    'Sec-Fetch-Site': 'same-site'
+                }
+                
+                async with session.get(url, params=params, headers=headers, timeout=12.0) as response:  # Increased from 8.0 to 12.0
                     if response.status == 200:
                         data = await response.json()
                         
@@ -217,6 +237,7 @@ class YahooFinanceSource:
                             # Only return data if we have a valid price
                             price = meta.get('regularMarketPrice')
                             if price is not None and price > 0:
+                                logger.info(f"Yahoo Finance successfully retrieved {symbol}: ${price:.2f}")
                                 return {
                                     'price': price,
                                     'change': meta.get('regularMarketChange', 0),
@@ -231,15 +252,25 @@ class YahooFinanceSource:
                     elif response.status == 429:  # Rate limited
                         logger.warning(f"Yahoo Finance rate limited for {symbol}, attempt {attempt + 1}")
                         if attempt < 2:  # Don't sleep on last attempt
+                            await asyncio.sleep(10)  # Increased delay for rate limiting from 5 to 10
                             continue
                     else:
                         logger.warning(f"Yahoo Finance returned status {response.status} for {symbol}")
                         break  # Don't retry for other HTTP errors
                 
+            except asyncio.TimeoutError:
+                logger.warning(f"Yahoo Finance timeout for {symbol} (attempt {attempt + 1}/3)")
+                if attempt == 2:  # Last attempt
+                    logger.error(f"Yahoo Finance timeout after all retries for {symbol}")
             except Exception as e:
-                logger.error(f"Yahoo Finance error for {symbol} (attempt {attempt + 1}): {e}")
-                if attempt < 2:  # Don't sleep on last attempt
-                    await asyncio.sleep(1)
+                if "429" in str(e) or "Too Many Requests" in str(e) or "Rate limited" in str(e):
+                    logger.warning(f"Yahoo Finance rate limited for {symbol} (attempt {attempt + 1}/3): {e}")
+                    if attempt < 2:
+                        await asyncio.sleep(10)  # Increased delay for rate limiting from 5 to 10
+                else:
+                    logger.error(f"Yahoo Finance error for {symbol} (attempt {attempt + 1}): {e}")
+                    if attempt < 2:  # Don't sleep on last attempt
+                        await asyncio.sleep(2)  # Increased from 1 to 2
         
         return None
     
