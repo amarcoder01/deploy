@@ -176,10 +176,20 @@ class TelegramHandler:
 
         logger.info("Telegram handler initialized with all advanced trading services, intelligent memory, modern UI, and enhanced error handling")
     
-    async def run(self):
-        """Run the Telegram bot with proper initialization and cleanup"""
+    async def run(self, use_webhook=None):
+        """Run the Telegram bot with proper initialization and cleanup
+        
+        Args:
+            use_webhook: If True, use webhook mode. If False, use polling. 
+                        If None, auto-detect based on environment.
+        """
         try:
             logger.info("Starting Telegram bot...")
+            
+            # Auto-detect mode if not specified
+            if use_webhook is None:
+                # Use webhook if PORT environment variable is set (deployment)
+                use_webhook = bool(os.environ.get('PORT'))
             
             # Create application
             self.application = Application.builder().token(self.bot_token).build()
@@ -191,12 +201,12 @@ class TelegramHandler:
             await self.application.initialize()
             await self.application.start()
             
-            # Start polling for updates
-            logger.info("Starting bot polling...")
-            await self.application.updater.start_polling(
-                drop_pending_updates=True,  # Drop pending updates to avoid conflicts
-                allowed_updates=None  # Allow all update types
-            )
+            if use_webhook:
+                logger.info("Starting bot in webhook mode...")
+                await self._start_webhook()
+            else:
+                logger.info("Starting bot in polling mode...")
+                await self._start_polling()
             
             # Start alert monitoring
             if not self.alert_monitoring_task:
@@ -205,17 +215,76 @@ class TelegramHandler:
             
             logger.info("✅ Telegram bot is running successfully!")
             
-            # Keep the bot running
-            try:
-                while True:
-                    await asyncio.sleep(1)
-            except asyncio.CancelledError:
-                logger.info("Bot run loop cancelled")
+            # Keep the bot running only in polling mode
+            if not use_webhook:
+                try:
+                    while True:
+                        await asyncio.sleep(1)
+                except asyncio.CancelledError:
+                    logger.info("Bot run loop cancelled")
                 
         except Exception as e:
             logger.error(f"Error starting Telegram bot: {e}")
             await self.stop()
             raise
+    
+    async def _start_polling(self):
+        """Start the bot in polling mode"""
+        try:
+            await self.application.updater.start_polling(
+                drop_pending_updates=True,  # Drop pending updates to avoid conflicts
+                allowed_updates=None  # Allow all update types
+            )
+            logger.info("Bot polling started successfully")
+        except Exception as e:
+            logger.error(f"Error starting polling: {e}")
+            raise
+    
+    async def _start_webhook(self):
+        """Start the bot in webhook mode"""
+        try:
+            # Get webhook URL from environment or construct it
+            webhook_url = os.environ.get('WEBHOOK_URL')
+            if not webhook_url:
+                # Construct webhook URL from Render app URL
+                app_url = os.environ.get('RENDER_EXTERNAL_URL')
+                if not app_url:
+                    # Fallback: construct from service name
+                    service_name = os.environ.get('RENDER_SERVICE_NAME', 'tradeai-companion')
+                    webhook_url = f"https://{service_name}.onrender.com/webhook"
+                else:
+                    webhook_url = f"{app_url}/webhook"
+            
+            # Set webhook
+            await self.application.bot.set_webhook(
+                url=webhook_url,
+                drop_pending_updates=True,
+                allowed_updates=None
+            )
+            
+            logger.info(f"Webhook set successfully: {webhook_url}")
+            
+        except Exception as e:
+            logger.error(f"Error setting webhook: {e}")
+            # Fallback to polling if webhook fails
+            logger.info("Falling back to polling mode...")
+            await self._start_polling()
+    
+    async def handle_webhook(self, request):
+        """Handle incoming webhook requests"""
+        try:
+            # Get the update from the request
+            update_data = await request.json()
+            update = Update.de_json(update_data, self.application.bot)
+            
+            # Process the update
+            await self.application.process_update(update)
+            
+            return {'status': 'ok'}
+            
+        except Exception as e:
+            logger.error(f"Error processing webhook: {e}")
+            return {'status': 'error', 'message': str(e)}
     
     async def _start_alert_monitoring(self):
         """Start the alert monitoring service"""
@@ -257,7 +326,20 @@ class TelegramHandler:
             
             # Stop the application
             if self.application:
-                await self.application.updater.stop()
+                # Delete webhook if it was set
+                try:
+                    await self.application.bot.delete_webhook()
+                    logger.info("Webhook deleted")
+                except Exception as e:
+                    logger.warning(f"Error deleting webhook: {e}")
+                
+                # Stop updater only if it was started (polling mode)
+                try:
+                    if self.application.updater.running:
+                        await self.application.updater.stop()
+                except Exception as e:
+                    logger.warning(f"Error stopping updater: {e}")
+                
                 await self.application.stop()
                 await self.application.shutdown()
                 logger.info("Telegram application stopped")

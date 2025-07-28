@@ -259,11 +259,24 @@ def create_app():
         async def favicon_handler(request):
             return web.Response(status=404)
         
+        async def webhook_handler(request):
+            """Handle Telegram webhook requests"""
+            try:
+                if bot_instance and bot_instance.telegram_handler:
+                    result = await bot_instance.telegram_handler.handle_webhook(request)
+                    return web.json_response(result)
+                else:
+                    return web.json_response({'status': 'error', 'message': 'Bot not ready'}, status=503)
+            except Exception as e:
+                logger.error(f"Webhook handler error: {e}")
+                return web.json_response({'status': 'error', 'message': str(e)}, status=500)
+        
         _app_instance.router.add_get('/health', bot_instance.health_check)
         _app_instance.router.add_get('/ready', bot_instance.readiness_check)
         _app_instance.router.add_get('/metrics', bot_instance.metrics_endpoint)
         _app_instance.router.add_get('/', root_handler)
         _app_instance.router.add_get('/favicon.ico', favicon_handler)
+        _app_instance.router.add_post('/webhook', webhook_handler)
         
         # Initialize bot in background
         async def init_bot():
