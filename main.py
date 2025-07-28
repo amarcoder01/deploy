@@ -225,7 +225,7 @@ async def main():
 _app_instance = None
 bot_instance = None
 
-def create_app():
+async def create_app():
     """Create and return the web application for deployment"""
     global _app_instance, bot_instance
     if _app_instance is None:
@@ -393,13 +393,27 @@ if __name__ == "__main__":
 def app(argv=None):
     """Factory function for aiohttp.web deployment"""
     import logging
+    import asyncio
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
     
     logger.info("App factory called by aiohttp.web")
     logger.info(f"Arguments: {argv}")
     
-    app_instance = create_app()
+    # Since create_app is now async, we need to run it in an event loop
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # If we're already in an event loop, we can't use run_until_complete
+            # This shouldn't happen in normal gunicorn usage, but just in case
+            raise RuntimeError("Cannot create app from within running event loop")
+        app_instance = loop.run_until_complete(create_app())
+    except RuntimeError:
+        # Fallback: create new event loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        app_instance = loop.run_until_complete(create_app())
+    
     logger.info(f"Created app instance: {type(app_instance)}")
     logger.info(f"App has {len(list(app_instance.router.routes()))} routes")
     
@@ -408,12 +422,17 @@ def app(argv=None):
 # Alternative entry point for direct web server deployment
 async def init_app():
     """Initialize and return the web application"""
-    return create_app()
+    return await create_app()
 
 # For gunicorn/uvicorn deployment
 def get_app():
     """Get the application instance for WSGI/ASGI servers"""
-    return create_app()
-
-# Direct app instance for immediate access
-app_instance = create_app()
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+        return loop.run_until_complete(create_app())
+    except RuntimeError:
+        # Fallback: create new event loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        return loop.run_until_complete(create_app())
