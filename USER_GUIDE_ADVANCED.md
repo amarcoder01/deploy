@@ -8,9 +8,9 @@
 
 ### **Setting Alerts**
 ```
-/alert AAPL above 150
-/alert TSLA below 200
-/alert GOOGL above 2800
+/alert GOOG above 2800
+/alert GOOG below 2500
+/alert GOOG above 3000
 ```
 
 ### **Managing Your Alerts**
@@ -30,9 +30,9 @@
 
 ### **Getting AI Signals**
 ```
-/smart_signal AAPL
-/smart_signal TSLA
-/smart_signal GOOGL
+/smart_signal GOOG
+/smart_signal GOOG
+/smart_signal GOOG
 ```
 
 ### **What You Get**
@@ -79,15 +79,15 @@
 ### **Trading Commands**
 | Command | Description | Example |
 |---------|-------------|---------|
-| `/price` | Get stock price | `/price AAPL` |
-| `/chart` | Generate chart | `/chart TSLA 1d` |
-| `/analyze` | AI analysis | `/analyze NVDA` |
-| `/smart_signal` | AI signals | `/smart_signal AAPL` |
+| `/price` | Get stock price | `/price GOOG` |
+| `/chart` | Generate chart | `/chart GOOG 1d` |
+| `/analyze` | AI analysis | `/analyze GOOG` |
+| `/smart_signal` | AI signals | `/smart_signal GOOG` |
 
 ### **Alert Commands**
 | Command | Description | Example |
 |---------|-------------|---------|
-| `/alert` | Set price alert | `/alert AAPL above 150` |
+| `/alert` | Set price alert | `/alert GOOG above 2800` |
 | `/alerts` | List your alerts | `/alerts` |
 | `/remove_alert` | Remove alert | `/remove_alert alert_id` |
 
@@ -178,8 +178,8 @@
 
 ## 🎉 **Ready to Start?**
 
-1. **Set your first alert:** `/alert AAPL above 150`
-2. **Get an AI signal:** `/smart_signal TSLA`
+1. **Set your first alert:** `/alert GOOG above 2800`
+2. **Get an AI signal:** `/smart_signal GOOG`
 3. **Check your alerts:** `/alerts`
 
 

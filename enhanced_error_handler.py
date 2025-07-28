@@ -18,7 +18,7 @@ class EnhancedErrorHandler:
             'AMD', 'INTC', 'CRM', 'ORCL', 'ADBE', 'PYPL', 'UBER', 'LYFT',
             'SNAP', 'TWTR', 'SPOT', 'SQ', 'ROKU', 'ZM', 'DOCU', 'SHOP',
             'SPY', 'QQQ', 'VTI', 'IWM', 'DIA', 'XLF', 'XLK', 'XLE',
-            'BTC-USD', 'ETH-USD', 'ADA-USD', 'DOT-USD'
+            'GOOG', 'ETH-USD', 'ADA-USD', 'DOT-USD'
         ]
         
         # Valid command patterns
@@ -35,14 +35,14 @@ class EnhancedErrorHandler:
             'price': [
                 '/price AAPL',
                 '/price TSLA',
-                '/price BTC-USD',
+                '/price GOOG',
                 '/price SPY'
             ],
             'chart': [
                 '/chart AAPL',
                 '/chart TSLA 1M',
                 '/chart NVDA 6M',
-                '/chart SPY 1Y'
+                '/chart GOOG 1Y'
             ],
             'analyze': [
                 '/analyze AAPL',
@@ -52,7 +52,7 @@ class EnhancedErrorHandler:
             'alert': [
                 '/alert AAPL above 150',
                 '/alert TSLA below 200',
-                '/alert BTC-USD above 50000',
+                '/alert GOOG above 2800',
                 '/alert SPY below 400'
             ],
             'trade': [
@@ -364,7 +364,7 @@ class EnhancedErrorHandler:
         if command_name == 'price':
             help_text += "\n**Tips:**\n"
             help_text += "• Use stock symbols like AAPL, TSLA, MSFT\n"
-            help_text += "• For crypto, add -USD (e.g., BTC-USD)\n"
+            help_text += "• For crypto, add -USD (e.g., ETH-USD)\n"
             help_text += "• ETFs work too (SPY, QQQ, VTI)\n"
         
         elif command_name == 'chart':

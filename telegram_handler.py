@@ -498,13 +498,13 @@ Try `/price AAPL` or just ask: "How is Apple performing today?"
 • `/price AAPL` - Get Apple's current price
 • `/price TSLA` - Get Tesla's current price
 • `/price SPY` - Get S&P 500 ETF price
-• `/price BTC-USD` - Get Bitcoin price
+• `/price GOOG` - Get Google price
 
 **📈 VIEW CHARTS:**
 • `/chart AAPL` - See Apple's price chart
 • `/chart TSLA 1M` - Tesla chart for 1 month
 • `/chart NVDA 6M` - NVIDIA chart for 6 months
-• `/chart SPY 1Y` - S&P 500 chart for 1 year
+• `/chart GOOG 1Y` - Google chart for 1 year
 
 **🤖 GET AI ANALYSIS:**
 • `/analyze AAPL` - AI analysis of Apple
@@ -522,7 +522,7 @@ Try `/price AAPL` or just ask: "How is Apple performing today?"
 **💡 WHAT STOCKS CAN I CHECK:**
 • **US Stocks:** Apple (AAPL), Tesla (TSLA), Microsoft (MSFT), etc.
 • **ETFs:** SPY, QQQ, VTI (popular investment funds)
-• **Crypto:** BTC-USD (Bitcoin), ETH-USD (Ethereum)
+• **Crypto:** GOOG (Google), ETH-USD (Ethereum)
 • **Indices:** ^GSPC (S&P 500), ^IXIC (NASDAQ)
 
 **⚡ QUICK TIPS:**
@@ -567,7 +567,7 @@ Try `/price AAPL` or just ask: "How is Apple performing today?"
 **📊 ALERT EXAMPLES:**
 • "Tell me when Apple hits $180" → `/alert AAPL above 180`
 • "Alert me if Tesla drops to $150" → `/alert TSLA below 150`
-• "Notify me when Bitcoin reaches $50k" → `/alert BTC-USD above 50000`
+• "Notify me when Google reaches $2800" → `/alert GOOG above 2800`
 • "Let me know if SPY falls below $380" → `/alert SPY below 380`
 
 **⚡ QUICK TIPS:**
