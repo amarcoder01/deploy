@@ -293,9 +293,12 @@ async def create_app():
                 
                 # Start background services with error handling
                 try:
-                    start_metrics_server(port=9090)
+                    metrics_port = start_metrics_server(port=9090)
                     setup_periodic_cleanup()
-                    logger.info("Background services started")
+                    if metrics_port:
+                        logger.info(f"Background services started - Metrics available on port {metrics_port}")
+                    else:
+                        logger.info("Background services started - Metrics server unavailable (port conflicts)")
                 except Exception as e:
                     logger.warning(f"Background services failed to start: {e}")
                 

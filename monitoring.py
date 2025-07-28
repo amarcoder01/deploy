@@ -176,12 +176,28 @@ class BotMetrics:
 metrics = BotMetrics()
 
 def start_metrics_server(port: int = 9090):
-    """Start the Prometheus metrics HTTP server"""
-    try:
-        start_http_server(port)
-        logger.info(f"Metrics server started on port {port}")
-    except Exception as e:
-        logger.error(f"Failed to start metrics server: {e}")
+    """Start the Prometheus metrics HTTP server with fallback ports"""
+    # Try multiple ports in case the default is in use
+    ports_to_try = [port, port + 1, port + 2, 9091, 9092, 9093]
+    
+    for try_port in ports_to_try:
+        try:
+            start_http_server(try_port)
+            logger.info(f"Metrics server started on port {try_port}")
+            return try_port
+        except OSError as e:
+            if "Address already in use" in str(e) or "[Errno 98]" in str(e):
+                logger.warning(f"Port {try_port} is already in use, trying next port...")
+                continue
+            else:
+                logger.error(f"Failed to start metrics server on port {try_port}: {e}")
+                break
+        except Exception as e:
+            logger.error(f"Failed to start metrics server on port {try_port}: {e}")
+            break
+    
+    logger.warning("Could not start metrics server on any available port. Metrics collection will continue but HTTP endpoint will be unavailable.")
+    return None
 
 def setup_periodic_cleanup():
     """Setup periodic cleanup of metrics"""
