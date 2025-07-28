@@ -9,7 +9,7 @@ from dataclasses import asdict
 
 from intelligent_memory_system import (
     IntelligentMemorySystem, MemoryType, MemoryImportance, 
-    MemoryEntry, intelligent_memory
+    MemoryEntry, get_intelligent_memory
 )
 from conversation_memory import ConversationMemory
 from logger import BotLogger
@@ -25,8 +25,14 @@ class EnhancedMemoryService:
     def __init__(self):
         """Initialize the enhanced memory service"""
         self.conversation_memory = ConversationMemory()
-        self.intelligent_memory = intelligent_memory
+        self.intelligent_memory = None  # Lazy loaded
         self.memory_integration_enabled = True
+        
+    def _get_intelligent_memory(self):
+        """Get intelligent memory instance, lazy loading if needed"""
+        if self.intelligent_memory is None:
+            self.intelligent_memory = get_intelligent_memory()
+        return self.intelligent_memory
         
         logger.info("Enhanced Memory Service initialized")
     
@@ -73,7 +79,7 @@ class EnhancedMemoryService:
                 }
             )
             
-            success = await self.intelligent_memory.add_memory(memory_entry)
+            success = await self._get_intelligent_memory().add_memory(memory_entry)
             memory_id = "success" if success else "failed"
             
             # Extract and store preferences if detected
@@ -104,14 +110,14 @@ class EnhancedMemoryService:
             response_data = {}
             
             # Get relevant memories using search
-            relevant_memories = await self.intelligent_memory.search_memories(
+            relevant_memories = await self._get_intelligent_memory().search_memories(
                 user_id=user_id,
                 query=current_query,
                 limit=10
             )
             
             # Get contextual memories
-            contextual_memories = await self.intelligent_memory.get_contextual_memories(
+            contextual_memories = await self._get_intelligent_memory().get_contextual_memories(
                 user_id=user_id,
                 context=current_query,
                 limit=5
@@ -191,7 +197,7 @@ class EnhancedMemoryService:
                  }
              )
              
-             await self.intelligent_memory.add_memory(memory_entry)
+             await self._get_intelligent_memory().add_memory(memory_entry)
              
              logger.info(f"Recorded trading activity for user {user_id}: {content}")
             
@@ -231,7 +237,7 @@ class EnhancedMemoryService:
                  }
              )
              
-             await self.intelligent_memory.add_memory(memory_entry)
+             await self._get_intelligent_memory().add_memory(memory_entry)
              
              logger.info(f"Recorded alert activity for user {user_id}: {content}")
             
@@ -249,13 +255,13 @@ class EnhancedMemoryService:
         """
         try:
             # Get intelligent memory stats
-            memory_stats = await self.intelligent_memory.get_memory_stats(user_id)
+            memory_stats = await self._get_intelligent_memory().get_memory_stats(user_id)
             
             # Get conversation stats
             conversation_stats = self.conversation_memory.get_session_stats(user_id)
             
             # Get recent insights
-            recent_insights = await self.intelligent_memory.retrieve_memories(
+            recent_insights = await self._get_intelligent_memory().retrieve_memories(
                 user_id=user_id,
                 query="insight pattern behavior",
                 memory_types=[MemoryType.INSIGHT],
@@ -351,7 +357,7 @@ class EnhancedMemoryService:
     async def _get_user_patterns(self, user_id: int) -> List[str]:
         """Get user behavioral patterns"""
         try:
-            pattern_memories = await self.intelligent_memory.retrieve_memories(
+            pattern_memories = await self._get_intelligent_memory().retrieve_memories(
                 user_id=user_id,
                 query="pattern behavior insight",
                 memory_types=[MemoryType.INSIGHT],
@@ -364,5 +370,12 @@ class EnhancedMemoryService:
             logger.error(f"Error getting user patterns: {e}")
             return []
 
-# Global instance
-enhanced_memory_service = EnhancedMemoryService()
+# Global instance - Lazy loaded to reduce memory usage
+enhanced_memory_service = None
+
+def get_enhanced_memory_service():
+    """Get the enhanced memory service instance, creating it if needed"""
+    global enhanced_memory_service
+    if enhanced_memory_service is None:
+        enhanced_memory_service = EnhancedMemoryService()
+    return enhanced_memory_service

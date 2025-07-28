@@ -18,6 +18,10 @@ print("----------------")
 
 # Ensure the current directory is in sys.path for module imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+# Apply memory optimizations early
+from memory_optimization import memory_optimizer
+
 from logger import logger
 from config import Config
 from telegram_handler import TelegramHandler

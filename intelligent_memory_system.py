@@ -563,5 +563,12 @@ class IntelligentMemorySystem:
                 'error': str(e)
             }
 
-# Global instance
-intelligent_memory = IntelligentMemorySystem()
+# Global instance - Lazy loaded to reduce memory usage
+intelligent_memory = None
+
+def get_intelligent_memory():
+    """Get the intelligent memory instance, creating it if needed"""
+    global intelligent_memory
+    if intelligent_memory is None:
+        intelligent_memory = IntelligentMemorySystem()
+    return intelligent_memory

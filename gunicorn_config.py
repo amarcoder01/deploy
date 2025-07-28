@@ -10,16 +10,16 @@ import multiprocessing
 bind = f"0.0.0.0:{os.environ.get('PORT', 8000)}"
 backlog = 2048
 
-# Worker processes
-workers = multiprocessing.cpu_count() * 2 + 1
+# Worker processes - Reduced for memory optimization on Render
+workers = 1  # Single worker to minimize memory usage
 worker_class = "aiohttp.GunicornWebWorker"
-worker_connections = 1000
-timeout = 30
+worker_connections = 500  # Reduced connections per worker
+timeout = 60  # Increased timeout for complex operations
 keepalive = 2
 
-# Restart workers after this many requests, to help prevent memory leaks
-max_requests = 1000
-max_requests_jitter = 50
+# Restart workers more frequently to prevent memory leaks
+max_requests = 500  # More frequent restarts
+max_requests_jitter = 25
 
 # Logging
 loglevel = "info"

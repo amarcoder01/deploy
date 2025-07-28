@@ -231,7 +231,7 @@ class ResponseCache:
     """Specialized cache for common bot responses"""
     
     def __init__(self):
-        self.cache = PerformanceCache(max_size=5000, ttl_seconds=1800)  # 30 minutes
+        self.cache = PerformanceCache(max_size=500, ttl_seconds=1800)  # Reduced for memory optimization
         self.response_templates = {
             'price_not_found': "❌ Sorry, I couldn't find price data for {symbol}. Please check the symbol and try again.",
             'analysis_error': "⚠️ Unable to perform analysis for {symbol} at the moment. Please try again later.",
@@ -375,9 +375,10 @@ class SyncConnectionContext:
             self.acquired = False
 
 # Global instances
-performance_cache = PerformanceCache()
+# Optimized cache settings for memory-constrained environments
+performance_cache = PerformanceCache(max_size=1000, ttl_seconds=1800)  # Reduced from 10000
 response_cache = ResponseCache()
-connection_pool = ConnectionPool()
+connection_pool = ConnectionPool(max_connections=10)  # Reduced from 50
 
 # Decorators for caching
 def cache_result(ttl: int = 3600, key_prefix: str = ""):
