@@ -1,9 +1,7 @@
-# Deployment trigger file
-# Update this file to force Render redeployment
-Last update: 2025-07-29 07:15:00
-# Fixed TelegramHandler.run() use_webhook parameter issue
-# Fixed ModernCallbackHandler.handle_callback_query method name
-# Fixed TelegramHandler.photo_handler method name (was incorrectly referenced as handle_photo)
-# FIXED: Added missing photo_handler method to TelegramHandler class
-# FIXED: Webhook configuration issue - bot now responds to messages
-# Force redeploy to ensure webhook is automatically configured on startup
+# Deployment trigger file for Render
+# Last updated: 2025-07-29 08:30:00
+# Changes: CRITICAL FIX - Removed blocking infinite loop in webhook mode that was causing premature shutdown
+# - Modified telegram_handler.py to not run blocking loop in webhook mode
+# - Enhanced webhook handler with detailed logging
+# - Fixed main.py to await bot initialization instead of creating background task
+# This should resolve the Gunicorn TERM signal and premature shutdown issue

@@ -329,8 +329,8 @@ async def create_app():
                 
                 secure_logger.log_system_event("bot_startup_complete", "Trading bot startup completed successfully with all security features enabled")
                 
-                # Start the telegram bot in background with webhook mode for deployment
-                asyncio.create_task(bot_instance.telegram_handler.run(use_webhook=True))
+                # Initialize the telegram bot for webhook mode (no blocking loop needed)
+                await bot_instance.telegram_handler.run(use_webhook=True)
                 
             except Exception as e:
                 logger.error(f"Bot initialization failed: {e}")

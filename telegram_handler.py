@@ -239,23 +239,23 @@ class TelegramHandler:
             if use_webhook:
                 logger.info("Starting bot in webhook mode...")
                 await self._start_webhook()
+                # In webhook mode, don't run the blocking loop - let aiohttp handle requests
+                logger.info("✅ Telegram bot webhook configured successfully!")
             else:
                 logger.info("Starting bot in polling mode...")
                 await self._start_polling()
+                # Only run the blocking loop in polling mode
+                logger.info("✅ Telegram bot is running successfully!")
+                try:
+                    while True:
+                        await asyncio.sleep(1)
+                except asyncio.CancelledError:
+                    logger.info("Bot run loop cancelled")
             
             # Start alert monitoring
             if not self.alert_monitoring_task:
                 await self._start_alert_monitoring()
                 logger.info("Alert monitoring started")
-            
-            logger.info("✅ Telegram bot is running successfully!")
-            
-            # Keep the bot running in both polling and webhook modes
-            try:
-                while True:
-                    await asyncio.sleep(1)
-            except asyncio.CancelledError:
-                logger.info("Bot run loop cancelled")
                 
         except Exception as e:
             logger.error(f"Error starting Telegram bot: {e}")
@@ -309,15 +309,18 @@ class TelegramHandler:
         try:
             # Get the update from the request
             update_data = await request.json()
+            logger.info(f"Received Telegram webhook update (payload): {update_data}")
+            
             update = Update.de_json(update_data, self.application.bot)
             
             # Process the update
             await self.application.process_update(update)
             
+            logger.info("Webhook update processed successfully")
             return {'status': 'ok'}
             
         except Exception as e:
-            logger.error(f"Error processing webhook: {e}")
+            logger.error(f"Error processing webhook: {e}", exc_info=True)
             return {'status': 'error', 'message': str(e)}
     
     async def _start_alert_monitoring(self):
