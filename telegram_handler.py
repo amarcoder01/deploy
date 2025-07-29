@@ -22,28 +22,30 @@ if hasattr(os, 'tzset'):
 import pytz
 os.environ['APSCHEDULER_TIMEZONE'] = 'UTC'
 
-# Patch APScheduler timezone handling before importing telegram
+# CRITICAL: Comprehensive APScheduler timezone patching
 try:
-    import apscheduler.util
+    import sys
     
-    def patched_astimezone(obj):
-        """Patched version that always returns pytz.UTC to avoid timezone validation errors"""
-        return pytz.UTC
-    
-    # Replace the problematic function entirely
-    apscheduler.util.astimezone = patched_astimezone
-    
-    # Also patch the get_localzone function if it exists
-    try:
-        from apscheduler.util import get_localzone
-        def patched_get_localzone():
-            return pytz.UTC
-        apscheduler.util.get_localzone = patched_get_localzone
-    except ImportError:
-        pass
+    # Patch apscheduler before it's imported by telegram
+    if 'apscheduler' not in sys.modules:
+        # Pre-import and patch apscheduler
+        import apscheduler.util
+        import apscheduler.schedulers.base
         
-except ImportError:
-    pass  # APScheduler not available
+        def force_utc_timezone(obj=None):
+            """Force UTC timezone for all APScheduler operations"""
+            return pytz.UTC
+        
+        # Replace all timezone-related functions
+        apscheduler.util.astimezone = force_utc_timezone
+        apscheduler.util.get_localzone = force_utc_timezone
+        apscheduler.schedulers.base.astimezone = force_utc_timezone
+        apscheduler.schedulers.base.get_localzone = force_utc_timezone
+        
+        print("✅ APScheduler timezone patching completed")
+        
+except Exception as e:
+    print(f"⚠️ APScheduler timezone patching failed: {e}")
 from telegram import Update, InputFile, ReplyKeyboardRemove
 from telegram import Bot
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
