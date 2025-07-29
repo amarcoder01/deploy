@@ -46,8 +46,10 @@ try:
     from qlib.contrib.model.pytorch_model import GRUModel
     from qlib.data import D
     QLIB_AVAILABLE = True
-except ImportError:
+    logger.info("Qlib successfully imported")
+except ImportError as e:
     QLIB_AVAILABLE = False
+    logger.info(f"Qlib not available ({e}), using fallback strategies with yfinance")
 import pandas as pd
 from datetime import datetime, timedelta
 try:
@@ -76,7 +78,7 @@ class AdvancedQlibStrategies:
             except Exception as e:
                 logger.error(f"Failed to initialize Qlib: {e}")
         else:
-            logger.warning("Qlib not available, will use yfinance for data fetching")
+            logger.info("Qlib not available, using yfinance for data fetching")
         
     def initialize_qlib(self):
         """Initialize Qlib with US market data"""
