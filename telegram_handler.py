@@ -380,7 +380,7 @@ class TelegramHandler:
         self.application.add_handler(CommandHandler("price", self.price_command))
         self.application.add_handler(CommandHandler("chart", self.chart_command))
         self.application.add_handler(CommandHandler("analyze", self.analyze_command))
-        self.application.add_handler(CommandHandler("alert", self.alert_command))
+        self.application.add_handler(CommandHandler("alert", self.process_alert_input))
         self.application.add_handler(CommandHandler("alerts", self.alerts_command))
         self.application.add_handler(CommandHandler("portfolio", self.portfolio_command))
         self.application.add_handler(CommandHandler("watchlist", self.watchlist_command))
