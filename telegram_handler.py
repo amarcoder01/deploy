@@ -17,9 +17,33 @@ except ImportError:
 os.environ['TZ'] = 'UTC'
 if hasattr(os, 'tzset'):
     os.tzset()
+
 # Import pytz and set default timezone for APScheduler
 import pytz
 os.environ['APSCHEDULER_TIMEZONE'] = 'UTC'
+
+# Patch APScheduler timezone handling before importing telegram
+try:
+    import apscheduler.util
+    
+    def patched_astimezone(obj):
+        """Patched version that always returns pytz.UTC to avoid timezone validation errors"""
+        return pytz.UTC
+    
+    # Replace the problematic function entirely
+    apscheduler.util.astimezone = patched_astimezone
+    
+    # Also patch the get_localzone function if it exists
+    try:
+        from apscheduler.util import get_localzone
+        def patched_get_localzone():
+            return pytz.UTC
+        apscheduler.util.get_localzone = patched_get_localzone
+    except ImportError:
+        pass
+        
+except ImportError:
+    pass  # APScheduler not available
 from telegram import Update, InputFile, ReplyKeyboardRemove
 from telegram import Bot
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
@@ -191,8 +215,19 @@ class TelegramHandler:
                 # Use webhook if PORT environment variable is set (deployment)
                 use_webhook = bool(os.environ.get('PORT'))
             
-            # Create application
-            self.application = Application.builder().token(self.bot_token).build()
+            # Create application with job queue disabled and custom timezone handling
+            # Set pytz timezone explicitly to avoid APScheduler timezone errors
+            import pytz
+            utc_tz = pytz.UTC
+            
+            # Create application builder with explicit timezone configuration
+            builder = Application.builder().token(self.bot_token)
+            
+            # Completely disable job queue to avoid APScheduler timezone issues
+            builder = builder.job_queue(None)
+            
+            # Build the application
+            self.application = builder.build()
             
             # Setup all handlers
             self._setup_handlers()
@@ -215,13 +250,12 @@ class TelegramHandler:
             
             logger.info("✅ Telegram bot is running successfully!")
             
-            # Keep the bot running only in polling mode
-            if not use_webhook:
-                try:
-                    while True:
-                        await asyncio.sleep(1)
-                except asyncio.CancelledError:
-                    logger.info("Bot run loop cancelled")
+            # Keep the bot running in both polling and webhook modes
+            try:
+                while True:
+                    await asyncio.sleep(1)
+            except asyncio.CancelledError:
+                logger.info("Bot run loop cancelled")
                 
         except Exception as e:
             logger.error(f"Error starting Telegram bot: {e}")
