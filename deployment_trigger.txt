@@ -1,6 +1,7 @@
 # Deployment trigger file
 # Update this file to force Render redeployment
-Last update: 2025-07-29 02:15:00
+Last update: 2025-07-29 02:30:00
 # Fixed TelegramHandler.run() use_webhook parameter issue
 # Fixed ModernCallbackHandler.handle_callback_query method name
-# Force redeploy to use latest code with callback handler fix
+# Fixed TelegramHandler.photo_handler method name (was incorrectly referenced as handle_photo)
+# Force redeploy to use latest code with photo handler fix
