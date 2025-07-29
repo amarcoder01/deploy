@@ -388,7 +388,7 @@ class TelegramHandler:
         self.application.add_handler(CommandHandler("strategy", self.strategy_command))
         
         # Callback query handler for inline keyboards
-        self.application.add_handler(CallbackQueryHandler(self.callback_handler.handle_callback))
+        self.application.add_handler(CallbackQueryHandler(self.callback_handler.handle_callback_query))
         
         # Message handlers
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
