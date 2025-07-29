@@ -392,7 +392,7 @@ class TelegramHandler:
         
         # Message handlers
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
-        self.application.add_handler(MessageHandler(filters.PHOTO, self.handle_photo))
+        self.application.add_handler(MessageHandler(filters.PHOTO, self.photo_handler))
         
         logger.info("All handlers setup successfully")
     
