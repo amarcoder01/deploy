@@ -396,6 +396,56 @@ class TelegramHandler:
         
         logger.info("All handlers setup successfully")
     
+    async def photo_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle photo messages with AI-powered chart analysis"""
+        try:
+            # Log that we received a photo
+            user_id = update.effective_user.id
+            logger.info(f"Received photo from user {user_id}")
+            
+            # Get the photo file_id (largest size)
+            photo = update.message.photo[-1]
+            file_id = photo.file_id
+            
+            # Send initial processing message
+            processing_msg = await update.message.reply_text(
+                "📊 *Analyzing your chart...*\n\n⏳ Please wait while I process the image with AI.",
+                parse_mode='Markdown'
+            )
+            
+            try:
+                # Download the photo
+                file = await context.bot.get_file(file_id)
+                file_bytes = await file.download_as_bytearray()
+                
+                # Use OpenAI to analyze the image
+                analysis = await self.openai_service.analyze_image(bytes(file_bytes), user_id)
+                
+                if analysis:
+                    # Edit the processing message with the analysis
+                    await processing_msg.edit_text(
+                        f"📊 *Chart Analysis Complete*\n\n{analysis}",
+                        parse_mode='Markdown'
+                    )
+                else:
+                    await processing_msg.edit_text(
+                        "❌ *Analysis Failed*\n\nSorry, I couldn't analyze this image. Please try with a clearer chart image.",
+                        parse_mode='Markdown'
+                    )
+                    
+            except Exception as e:
+                logger.error(f"Error analyzing photo: {e}")
+                await processing_msg.edit_text(
+                    "❌ *Error Processing Image*\n\nSorry, there was an error analyzing your chart. Please try again.",
+                    parse_mode='Markdown'
+                )
+                
+        except Exception as e:
+            logger.error(f"Error in photo_handler: {e}")
+            await update.message.reply_text(
+                "❌ Sorry, I encountered an error processing your photo. Please try again."
+            )
+    
     def _get_ist_timestamp(self) -> str:
         """Get current timestamp in IST format"""
         return format_ist_timestamp('%Y-%m-%d %H:%M:%S IST')
@@ -2141,6 +2191,7 @@ Do NOT fetch any actual stock data - just provide a conversational response guid
             logger.error(f"Error in pdf_handler: {str(e)}")
             await update.message.reply_text("❌ Error analyzing the PDF. Please try again later.")
     
+    @remember_interaction(memory_type=MemoryType.CONVERSATION, importance=MemoryImportance.MEDIUM)
     async def photo_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """
         Handle photo uploads from users and analyze chart images using OpenAI Vision.
